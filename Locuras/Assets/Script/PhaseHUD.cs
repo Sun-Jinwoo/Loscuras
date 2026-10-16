@@ -26,8 +26,13 @@ public class PhaseHUD : MonoBehaviour
 
     void OnPhase(Phase p)
     {
-        phaseText.text = p == Phase.Amber ? "ÁMBAR: ATACAR" : "AZUL: RECOLECTAR";
-        phaseText.color = p == Phase.Amber ? amber : blue;
+        bool isAmber = p == Phase.Amber;
+
+        phaseText.text = isAmber
+            ? "ÁMBAR (calor): corrosivos x1.5, fríos x0.7"
+            : "AZUL (frío): fríos x1.5, corrosivos x0.7";
+
+        phaseText.color = isAmber ? amber : blue;
     }
 
     void RefreshCycles() => cyclesText.text = "Ciclos: " + clock.CyclesRemaining;

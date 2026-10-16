@@ -1,118 +1,137 @@
-using System;
 using UnityEngine;
 
-public class CrystalEnemy : MonoBehaviour, IDischargeable
+public class CrystalEnemy : MonoBehaviour, IChemTarget
 {
-    [Header("Vida y botín")]
-    [SerializeField] int health = 3;
-    [SerializeField] int samplesDropped = 1;
+    public enum CrystalType { Saline, Warm }
 
-    [Header("Fase ámbar: persigue y golpea")]
-    [SerializeField] float chaseSpeed = 4f;
+    [Header("Tipo y vida")]
+    [SerializeField] CrystalType type = CrystalType.Saline;
+    [SerializeField] float maxHealth = 80f;
+    [SerializeField] float contactDps = 10f;
+
+    [Header("Movimiento")]
+    [SerializeField] float amberSpeed = 4f;
+    [SerializeField] float blueSpeed = 2f;
     [SerializeField] float attackRange = 1.6f;
-    [SerializeField] float attackCooldown = 1.5f;
+    [SerializeField] float aggroRange = 14f;
 
-    [Header("Fase azul: huye")]
-    [SerializeField] float fleeSpeed = 2.5f;
-    [SerializeField] float fleeDistance = 8f;
+    [Header("Mini jefe (opcional)")]
+    [SerializeField] int bossPartIndex = -1;                  // 0 a 3 = suelta ese componente
+    [SerializeField] Compound vulnerableTo = Compound.None;   // compuesto que le hace más daño
+    [SerializeField] float vulnerableMultiplier = 3f;
 
     [Header("Color")]
     [SerializeField] Renderer rend;
-    [SerializeField] Color amber = new(1f, 0.6f, 0.1f);
-    [SerializeField] Color blue = new(0.3f, 0.6f, 1f);
-
-    public event Action<CrystalEnemy> OnDied;
+    [SerializeField] Color salineColor = new Color(0.8f, 0.95f, 1f);
+    [SerializeField] Color warmColor = new Color(1f, 0.5f, 0.2f);
 
     PhaseClock clock;
     Transform player;
-    PlayerLives playerLives;
-    float nextAttackTime;
+    PlayerHealth playerHealth;
+    WorldHealthBar bar;
+    float health, slowUntil, stunUntil;
     bool dead;
-
-    // Un prefab no puede guardar referencias a objetos de la escena,
-    // por eso el WaveManager le pasa el reloj al crearlo.
-    public void Init(PhaseClock c)
-    {
-        clock = c;
-        clock.OnPhaseChanged += ApplyColor;
-        ApplyColor(clock.CurrentPhase);
-    }
 
     void Awake()
     {
         if (rend == null) rend = GetComponentInChildren<Renderer>();
+        bar = GetComponent<WorldHealthBar>();
+        if (bar == null) bar = gameObject.AddComponent<WorldHealthBar>();
+        health = maxHealth;
     }
 
     void Start()
     {
+        clock = FindFirstObjectByType<PhaseClock>();
         var p = GameObject.FindGameObjectWithTag("Player");
-        if (p == null)
+        if (p != null)
         {
-            Debug.LogError("CrystalEnemy: no encuentro ningún objeto con el tag Player", this);
-            return;
+            player = p.transform;
+            playerHealth = p.GetComponent<PlayerHealth>();
         }
-        player = p.transform;
-        playerLives = p.GetComponent<PlayerLives>();
-    }
+        else Debug.LogError("CrystalEnemy: no hay ningún objeto con el tag Player", this);
 
-    void OnDestroy()
-    {
-        if (clock != null) clock.OnPhaseChanged -= ApplyColor;
+        if (rend != null)
+            rend.material.color = type == CrystalType.Saline ? salineColor : warmColor;
     }
 
     void Update()
     {
-        if (dead || clock == null || player == null) return;
+        if (dead || player == null || clock == null) return;
+        if (Time.time < stunUntil) return;
 
-        Vector3 toPlayer = player.position - transform.position;
-        toPlayer.y = 0f;
-        float dist = toPlayer.magnitude;
-        if (dist < 0.01f) return;
-        Vector3 dir = toPlayer / dist;
+        Vector3 to = player.position - transform.position;
+        to.y = 0f;
+        float dist = to.magnitude;
+        if (dist < 0.01f || dist > aggroRange) return;
+        Vector3 dir = to / dist;
 
-        if (clock.CurrentPhase == Phase.Amber)
+        float speed = clock.CurrentPhase == Phase.Amber ? amberSpeed : blueSpeed;
+        if (Time.time < slowUntil) speed *= 0.3f;
+
+        if (dist > attackRange)
         {
-            if (dist > attackRange) Move(dir, chaseSpeed);
-            else TryAttack();
+            transform.position += dir * speed * Time.deltaTime;
+            transform.rotation = Quaternion.LookRotation(dir);
         }
-        else if (dist < fleeDistance)
+        else if (playerHealth != null)
         {
-            Move(-dir, fleeSpeed);
+            playerHealth.TakeDamage(contactDps * Time.deltaTime);
         }
     }
 
-    void Move(Vector3 dir, float speed)
+    float TypeMultiplier(DamageType t)
     {
-        transform.position += dir * speed * Time.deltaTime;
-        transform.rotation = Quaternion.LookRotation(dir);
+        if (t == DamageType.None) return 1f;
+        bool weak = (type == CrystalType.Saline && t == DamageType.Corrosive)
+                 || (type == CrystalType.Warm && t == DamageType.Cold);
+        return weak ? 2f : 0.5f;
     }
 
-    void TryAttack()
-    {
-        if (Time.time < nextAttackTime) return;
-        nextAttackTime = Time.time + attackCooldown;
-        if (playerLives != null) playerLives.LoseLife();
-    }
-
-    void ApplyColor(Phase p)
-    {
-        if (rend != null) rend.material.color = p == Phase.Amber ? amber : blue;
-    }
-
-    public void Discharge()
+    public void ApplyChem(ChemEffect e, Phase phase)
     {
         if (dead) return;
 
-        health--;
-        transform.localScale *= 0.85f;   // feedback rápido: se encoge al recibir daño
-        if (health <= 0) Die();
+        if (e.damage > 0f)
+        {
+            float mult = TypeMultiplier(e.type) * Chemistry.PhaseMultiplier(e.type, phase);
+            if (vulnerableTo != Compound.None && e.compound == vulnerableTo) mult *= vulnerableMultiplier;
+
+            float dmg = e.damage * mult;
+            health -= dmg;
+            bar.SetRatio(health / maxHealth);
+
+            string label = "-" + Mathf.RoundToInt(dmg);
+            Color col = Color.white;
+            if (mult >= 1.5f) { label += " ¡Eficaz!"; col = Color.yellow; }
+            else if (mult <= 0.6f) { label += " Resiste"; col = Color.gray; }
+            FloatingText.Spawn(transform.position + Vector3.up * 2f, label, col);
+        }
+
+        if (e.slowSeconds > 0f) slowUntil = Mathf.Max(slowUntil, Time.time + e.slowSeconds);
+        if (e.stunSeconds > 0f) stunUntil = Mathf.Max(stunUntil, Time.time + e.stunSeconds);
+
+        if (health <= 0f) Die();
     }
 
     void Die()
     {
         dead = true;
-        if (Flask.Instance != null) Flask.Instance.Add(samplesDropped);
-        OnDied?.Invoke(this);
+        var col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
+
+        Vector3 pos = transform.position;
+        if (Physics.Raycast(pos + Vector3.up, Vector3.down, out var hit, 10f, ~0, QueryTriggerInteraction.Ignore))
+            pos = hit.point;
+        pos += Vector3.up * 0.9f;
+
+        if (bossPartIndex >= 0)
+            Pickup.Create(pos, Pickup.Kind.BossPart, Reagent.Acid, 1, bossPartIndex);
+
+        Reagent drop = type == CrystalType.Saline ? Reagent.Acid : Reagent.Cryo;
+        int n = bossPartIndex >= 0 ? 3 : Random.Range(1, 3);
+        Pickup.Create(pos + new Vector3(0.5f, 0f, 0f), Pickup.Kind.Reagent, drop, n, 0);
+
         Destroy(gameObject);
     }
 }

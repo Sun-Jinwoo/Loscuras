@@ -14,7 +14,7 @@ GameObject:
   - component: {fileID: 1333213841952088872}
   - component: {fileID: 8024414157212114936}
   m_Layer: 0
-  m_Name: CrystalEnemy
+  m_Name: CrystalEnemySaline
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -127,11 +127,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc36ee47e14396a42bf6f7ed1aaadfb8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CrystalEnemy
-  health: 3
+  maxHealth: 50
+  contactDps: 10
+  pickupPrefab: {fileID: 0}
   samplesDropped: 1
   chaseSpeed: 4
   attackRange: 1.6
-  attackCooldown: 1.5
   fleeSpeed: 2.5
   fleeDistance: 8
   rend: {fileID: 0}
