@@ -4,10 +4,12 @@ public class WorldHealthBar : MonoBehaviour
 {
     [SerializeField] float width = 1.2f;
     [SerializeField] float height = 0.14f;
-    [SerializeField] float yOffset = 1.5f;
+    [SerializeField] float yOffset = 2.5f;
 
     Transform root, fill;
     Camera cam;
+
+    public void SetOffset(float y) => yOffset = y;
 
     void Awake()
     {
@@ -33,6 +35,7 @@ public class WorldHealthBar : MonoBehaviour
 
     public void SetRatio(float ratio)
     {
+        if (fill == null) return;
         ratio = Mathf.Clamp01(ratio);
         fill.localScale = new Vector3(width * ratio, height, 1f);
         fill.localPosition = new Vector3(-(width - width * ratio) / 2f, 0f, -0.01f);
@@ -40,7 +43,8 @@ public class WorldHealthBar : MonoBehaviour
 
     void LateUpdate()
     {
+        if (root == null) return;
         if (cam == null) cam = Camera.main;
-        if (cam != null) root.rotation = cam.transform.rotation;   // siempre de frente a ti
+        if (cam != null) root.rotation = cam.transform.rotation;
     }
 }

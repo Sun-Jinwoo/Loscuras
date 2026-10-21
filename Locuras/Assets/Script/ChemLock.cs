@@ -15,21 +15,38 @@ public class ChemLock : MonoBehaviour, IChemTarget, IInteractable
     [SerializeField] int rewardAmount = 2;
     [SerializeField] GameObject[] disableOnSolved;
     [SerializeField] Renderer rend;
+    [SerializeField] string saveId = "";
 
     bool solved;
 
     public string Prompt => solved ? "" : hint;
     public void Interact(Injector user) { }
 
+    public void Configure(Compound req, bool reqPhase, Phase ph, string h, Reagent rr, int amt, string id)
+    {
+        required = req; requirePhase = reqPhase; phase = ph; hint = h;
+        rewardReagent = rr; rewardAmount = amt; saveId = id;
+    }
+
     void Awake()
     {
         if (rend == null) rend = GetComponentInChildren<Renderer>();
+        if (!string.IsNullOrEmpty(saveId) && SaveSystem.Has("lock:" + saveId))
+            MarkSolvedVisual();
+    }
+
+    void MarkSolvedVisual()
+    {
+        solved = true;
+        if (rend != null) rend.material.color = new Color(0.3f, 0.9f, 0.4f);
+        foreach (var go in disableOnSolved)
+            if (go != null) go.SetActive(false);
     }
 
     public void ApplyChem(ChemEffect e, Phase currentPhase)
     {
         if (solved) return;
-        Vector3 above = transform.position + Vector3.up * 1.6f;
+        Vector3 above = transform.position + Vector3.up * 2f;
 
         if (e.compound != required)
         {
@@ -43,14 +60,12 @@ public class ChemLock : MonoBehaviour, IChemTarget, IInteractable
             return;
         }
 
-        solved = true;
+        MarkSolvedVisual();
         FloatingText.Spawn(above, "¡Cerradura abierta!", Color.green, 5f);
-        if (rend != null) rend.material.color = new Color(0.3f, 0.9f, 0.4f);
-
-        foreach (var go in disableOnSolved)
-            if (go != null) go.SetActive(false);
+        if (!string.IsNullOrEmpty(saveId)) SaveSystem.Mark("lock:" + saveId);
 
         if (rewardAmount > 0)
-            Pickup.Create(transform.position + Vector3.up * 1.2f, Pickup.Kind.Reagent, rewardReagent, rewardAmount, 0);
+            Pickup.Create(transform.position + Vector3.up * 1.4f, Pickup.Kind.Reagent, rewardReagent, rewardAmount, 0);
+        GameFlow.SaveNow();
     }
 }

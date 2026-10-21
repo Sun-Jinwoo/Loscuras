@@ -1,5 +1,8 @@
 using UnityEngine;
+using UnityEngine.AI;
 
+// Enemigo con NavMeshAgent: rodea paredes y columnas en vez de atravesarlas.
+[RequireComponent(typeof(NavMeshAgent))]
 public class CrystalEnemy : MonoBehaviour, IChemTarget
 {
     public enum CrystalType { Saline, Warm }
@@ -12,13 +15,17 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
     [Header("Movimiento")]
     [SerializeField] float amberSpeed = 4f;
     [SerializeField] float blueSpeed = 2f;
-    [SerializeField] float attackRange = 1.6f;
-    [SerializeField] float aggroRange = 14f;
+    [SerializeField] float attackRange = 1.8f;
+    [SerializeField] float aggroRange = 16f;
 
-    [Header("Mini jefe (opcional)")]
-    [SerializeField] int bossPartIndex = -1;                  // 0 a 3 = suelta ese componente
-    [SerializeField] Compound vulnerableTo = Compound.None;   // compuesto que le hace más daño
+    [Header("Mini jefe / jefe final")]
+    [SerializeField] int bossPartIndex = -1;
+    [SerializeField] Compound vulnerableTo = Compound.None;
     [SerializeField] float vulnerableMultiplier = 3f;
+    [SerializeField] bool isFinalBoss;
+
+    [Header("Guardado")]
+    [SerializeField] string saveId = "";
 
     [Header("Color")]
     [SerializeField] Renderer rend;
@@ -29,20 +36,44 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
     Transform player;
     PlayerHealth playerHealth;
     WorldHealthBar bar;
-    float health, slowUntil, stunUntil;
+    NavMeshAgent agent;
+    float health, slowUntil, stunUntil, nextPath;
     bool dead;
+
+    // La usa el constructor de nivel (en modo editor)
+    public void Configure(CrystalType t, float hp, float dps, int part, Compound weak, bool finalBoss, string id)
+    {
+        type = t; maxHealth = hp; contactDps = dps; bossPartIndex = part;
+        vulnerableTo = weak; isFinalBoss = finalBoss; saveId = id;
+    }
 
     void Awake()
     {
+        bool alreadyDead = bossPartIndex >= 0
+            ? SaveSystem.Has("part:" + bossPartIndex)
+            : (!string.IsNullOrEmpty(saveId) && SaveSystem.Has("dead:" + saveId));
+        if (alreadyDead && !isFinalBoss)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         if (rend == null) rend = GetComponentInChildren<Renderer>();
         bar = GetComponent<WorldHealthBar>();
         if (bar == null) bar = gameObject.AddComponent<WorldHealthBar>();
         health = maxHealth;
+
+        agent = GetComponent<NavMeshAgent>();
+        agent.stoppingDistance = attackRange * 0.7f;
+        agent.acceleration = 14f;
+        agent.angularSpeed = 360f;
+        agent.autoBraking = true;
     }
 
     void Start()
     {
         clock = FindFirstObjectByType<PhaseClock>();
+
         var p = GameObject.FindGameObjectWithTag("Player");
         if (p != null)
         {
@@ -53,30 +84,48 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
 
         if (rend != null)
             rend.material.color = type == CrystalType.Saline ? salineColor : warmColor;
+
+        // Coloca al agente sobre el NavMesh
+        if (agent != null && !agent.isOnNavMesh)
+        {
+            if (NavMesh.SamplePosition(transform.position, out var hit, 4f, NavMesh.AllAreas))
+                agent.Warp(hit.position);
+            else
+                Debug.LogWarning("CrystalEnemy: no hay NavMesh bajo " + name + ". ¿Existe el objeto con NavMeshSurface y RuntimeNavBaker?", this);
+        }
     }
 
     void Update()
     {
-        if (dead || player == null || clock == null) return;
-        if (Time.time < stunUntil) return;
+        if (dead || player == null || clock == null || agent == null || !agent.isOnNavMesh) return;
+
+        if (Time.time < stunUntil) { agent.isStopped = true; return; }
 
         Vector3 to = player.position - transform.position;
         to.y = 0f;
         float dist = to.magnitude;
-        if (dist < 0.01f || dist > aggroRange) return;
-        Vector3 dir = to / dist;
+
+        if (dist > aggroRange) { agent.isStopped = true; return; }
 
         float speed = clock.CurrentPhase == Phase.Amber ? amberSpeed : blueSpeed;
         if (Time.time < slowUntil) speed *= 0.3f;
+        agent.speed = speed;
 
         if (dist > attackRange)
         {
-            transform.position += dir * speed * Time.deltaTime;
-            transform.rotation = Quaternion.LookRotation(dir);
+            agent.isStopped = false;
+            if (Time.time >= nextPath)
+            {
+                nextPath = Time.time + 0.2f;
+                agent.SetDestination(player.position);
+            }
         }
-        else if (playerHealth != null)
+        else
         {
-            playerHealth.TakeDamage(contactDps * Time.deltaTime);
+            agent.isStopped = true;
+            if (dist > 0.01f)
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(to / dist), 10f * Time.deltaTime);
+            if (playerHealth != null) playerHealth.TakeDamage(contactDps * Time.deltaTime);
         }
     }
 
@@ -105,7 +154,7 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
             Color col = Color.white;
             if (mult >= 1.5f) { label += " ¡Eficaz!"; col = Color.yellow; }
             else if (mult <= 0.6f) { label += " Resiste"; col = Color.gray; }
-            FloatingText.Spawn(transform.position + Vector3.up * 2f, label, col);
+            FloatingText.Spawn(transform.position + Vector3.up * 2.5f * transform.localScale.y, label, col);
         }
 
         if (e.slowSeconds > 0f) slowUntil = Mathf.Max(slowUntil, Time.time + e.slowSeconds);
@@ -119,6 +168,16 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
         dead = true;
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
+        if (agent != null) agent.enabled = false;
+
+        if (isFinalBoss)
+        {
+            GameFlow.Victory();
+            Destroy(gameObject);
+            return;
+        }
+
+        if (bossPartIndex < 0 && !string.IsNullOrEmpty(saveId)) SaveSystem.Mark("dead:" + saveId);
 
         Vector3 pos = transform.position;
         if (Physics.Raycast(pos + Vector3.up, Vector3.down, out var hit, 10f, ~0, QueryTriggerInteraction.Ignore))
@@ -130,7 +189,7 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
 
         Reagent drop = type == CrystalType.Saline ? Reagent.Acid : Reagent.Cryo;
         int n = bossPartIndex >= 0 ? 3 : Random.Range(1, 3);
-        Pickup.Create(pos + new Vector3(0.5f, 0f, 0f), Pickup.Kind.Reagent, drop, n, 0);
+        Pickup.Create(pos + new Vector3(0.6f, 0f, 0f), Pickup.Kind.Reagent, drop, n, 0);
 
         Destroy(gameObject);
     }

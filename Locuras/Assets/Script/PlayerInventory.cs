@@ -7,8 +7,8 @@ public class PlayerInventory : MonoBehaviour
 
     public const int BossPartsTotal = 4;
 
-    [Header("Pruebas: reactivos iniciales (Ácido, Base, Crio). Pon 0 al terminar de probar.")]
-    [SerializeField] int[] startReagents = { 4, 2, 2 };
+    [Header("Reactivos iniciales (Ácido, Base, Crio)")]
+    [SerializeField] int[] startReagents = { 4, 0, 2 };
     [SerializeField] Compound[] startKnown = { Compound.ConcentratedAcid, Compound.NeutralSalt };
 
     public readonly int[] reagents = new int[3];
@@ -98,7 +98,6 @@ public class PlayerInventory : MonoBehaviour
         }
     }
 
-    // Devuelve true si la fórmula era nueva
     public bool Learn(Compound c)
     {
         if (c == Compound.None || known[(int)c]) return false;
@@ -111,7 +110,34 @@ public class PlayerInventory : MonoBehaviour
     {
         if (index < 0 || index >= BossPartsTotal) return;
         bossParts[index] = true;
+        SaveSystem.Mark("part:" + index);
         OnChanged?.Invoke();
-        if (HasAllBossParts) Debug.Log("¡Tienes los 4 componentes de la Fórmula Prima!");
+        if (HasAllBossParts) GameFlow.Hint("SORA: ¡Tienes los 4 componentes! La compuerta de la Cámara Central ya puede abrirse.", 9f);
+        GameFlow.SaveNow();
+    }
+
+    public void Restore(int[] r, int[] c, bool[] k, bool[] b, int sel)
+    {
+        Copy(r, reagents);
+        Copy(c, compounds);
+        Copy(k, known);
+        Copy(b, bossParts);
+
+        Selected = Compound.None;
+        if (sel >= 0 && sel < compounds.Length && compounds[sel] > 0) Selected = (Compound)sel;
+        else Cycle(1);
+        OnChanged?.Invoke();
+    }
+
+    static void Copy(int[] src, int[] dst)
+    {
+        if (src == null) return;
+        for (int i = 0; i < dst.Length && i < src.Length; i++) dst[i] = src[i];
+    }
+
+    static void Copy(bool[] src, bool[] dst)
+    {
+        if (src == null) return;
+        for (int i = 0; i < dst.Length && i < src.Length; i++) dst[i] = src[i];
     }
 }
