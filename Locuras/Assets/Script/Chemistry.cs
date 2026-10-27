@@ -27,7 +27,7 @@ public struct ChemEffect
     public float slowSeconds;
     public float stunSeconds;
     public float heal;
-    public float cloudSeconds;   // > 0 deja una nube
+    public float cloudSeconds;
     public float cloudDps;
 }
 
@@ -102,7 +102,6 @@ public static class Chemistry
     public static (Reagent a, Reagent b) RecipeOf(Compound c) => recipes[(int)c];
     public static ChemEffect Get(Compound c) => effects[(int)c];
 
-    // El reloj oscilante modifica la potencia
     public static float PhaseMultiplier(DamageType t, Phase p)
     {
         if (t == DamageType.Corrosive) return p == Phase.Amber ? 1.5f : 0.7f;

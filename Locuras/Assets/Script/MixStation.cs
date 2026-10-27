@@ -17,12 +17,14 @@ public class MixStation : MonoBehaviour, IInteractable
         openedFrame = Time.frameCount;
         slotA = slotB = -1;
         message = "";
+        Sfx.Play("ui_open", 0.7f);
         UIState.Set(true);
     }
 
     void Close()
     {
         open = false;
+        Sfx.Play("ui_click", 0.5f);
         UIState.Set(false);
     }
 
@@ -159,10 +161,12 @@ public class MixStation : MonoBehaviour, IInteractable
         var a = (Reagent)slotA;
         var b = (Reagent)slotB;
         var c = Chemistry.Mix(a, b);
-        if (c == Compound.None) { message = "No pasa nada..."; return; }
+        if (c == Compound.None) { message = "No pasa nada..."; Sfx.Play("ui_error", 0.7f); return; }
 
         inv.SpendReagents(a, b);
         inv.AddCompound(c);
+        Sfx.Play("mix_success", 0.9f);
+        Fx.Burst(transform.position + Vector3.up * 1.3f, Chemistry.Get(c).color, 30, 2.5f, 0.22f, 1f, -0.25f);
 
         string n = Chemistry.Get(c).name;
         message = inv.Learn(c) ? $"¡Nueva fórmula descubierta: {n}!" : $"Creaste: {n}";

@@ -22,7 +22,11 @@ public static class UIState
         Time.timeScale = open ? 0f : 1f;
 
         var player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null && player.GetComponent("FirstPersonController") is Behaviour fpc)
-            fpc.enabled = !open;
+        if (player != null)
+        {
+            // GetComponent("nombre") no encuentra tipos con namespace (StarterAssets.FirstPersonController): se busca por nombre de tipo
+            foreach (var mb in player.GetComponents<MonoBehaviour>())
+                if (mb != null && mb.GetType().Name == "FirstPersonController") mb.enabled = !open;
+        }
     }
 }

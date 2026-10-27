@@ -90,6 +90,8 @@ public class Pickup : MonoBehaviour, IInteractable
         var inv = PlayerInventory.Instance;
         if (inv == null) return;
 
+        Sfx.Play(kind == Kind.BossPart ? "pickup_part" : kind == Kind.Note ? "note_open" : "pickup", 0.8f);
+        Fx.Burst(transform.position, kind == Kind.Reagent ? Chemistry.ReagentColors[(int)reagent] : Color.yellow, 12, 2f, 0.15f, 0.5f, -0.2f);
         switch (kind)
         {
             case Kind.Reagent: inv.AddReagent(reagent, amount); break;

@@ -26,6 +26,8 @@ public class Dispenser : MonoBehaviour, IInteractable
         if (Time.time < readyAt || PlayerInventory.Instance == null) return;
         readyAt = Time.time + cooldown;
         PlayerInventory.Instance.AddReagent(reagent, amount);
+        Sfx.PlayAt("dispenser", transform.position, 0.9f);
+        Fx.Burst(transform.position + Vector3.up * 1.2f, Chemistry.ReagentColors[(int)reagent], 18, 2f, 0.2f, 0.8f, -0.3f);
         FloatingText.Spawn(transform.position + Vector3.up * 1.5f, "+" + amount + " " + Chemistry.ReagentNames[(int)reagent], Chemistry.ReagentColors[(int)reagent], 4f);
     }
 }

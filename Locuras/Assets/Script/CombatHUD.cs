@@ -5,9 +5,18 @@ using UnityEngine.UI;
 
 public class CombatHUD : MonoBehaviour
 {
+    public static bool HidePrompt;   // el teaser automático oculta el [E] de interacción
+    public static bool Hidden;   // F1 (TeaserTools) oculta el HUD para grabar
+    GameObject canvasGo;
+
     [SerializeField] PlayerHealth health;
 
-    RectTransform fillRect;
+    RectTransform fillRect, phaseFillRect;
+    Image phaseFill, phaseBg;
+    Image[] frame;
+    TMP_Text phaseLabel, promptText;
+    PhaseClock clock;
+    Injector injector;
     Image fillImage, flash;
     TMP_Text hpText, takenText, statsText;
     float flashAlpha, windowDamage, windowTime, shownTaken;
@@ -22,6 +31,8 @@ public class CombatHUD : MonoBehaviour
             enabled = false;
             return;
         }
+        clock = FindFirstObjectByType<PhaseClock>();
+        injector = FindFirstObjectByType<Injector>();
         BuildUI();
         health.OnDamaged += OnDamaged;
     }
@@ -39,6 +50,7 @@ public class CombatHUD : MonoBehaviour
 
     void Update()
     {
+        if (canvasGo != null && canvasGo.activeSelf == Hidden) canvasGo.SetActive(!Hidden);
         float ratio = Mathf.Clamp01(health.Current / health.Max);
         fillRect.anchorMax = new Vector2(ratio, 1f);
         fillImage.color = Color.Lerp(new Color(0.9f, 0.15f, 0.15f), new Color(0.3f, 0.85f, 0.4f), ratio);
@@ -58,6 +70,41 @@ public class CombatHUD : MonoBehaviour
 
         var inv = PlayerInventory.Instance;
         if (inv != null) statsText.text = BuildStats(inv);
+
+        UpdatePhase();
+        UpdatePrompt();
+    }
+
+    // Barra de fase arriba + marco de color alrededor de la pantalla
+    void UpdatePhase()
+    {
+        if (clock == null) { clock = FindFirstObjectByType<PhaseClock>(); if (clock == null) return; }
+
+        bool amberNow = clock.CurrentPhase == Phase.Amber;
+        Color c = amberNow ? new Color(1f, 0.65f, 0.2f) : new Color(0.4f, 0.7f, 1f);
+        float left = clock.TimeLeft;
+        float ratio = Mathf.Clamp01(left / Mathf.Max(0.01f, clock.PhaseDuration));
+
+        phaseFillRect.anchorMax = new Vector2(ratio, 0f);
+        phaseFill.color = c;
+
+        string name = amberNow ? "FASE ÁMBAR" : "FASE AZUL";
+        string sub = amberNow ? "Corrosivos x1.5  |  Fríos x0.7" : "Fríos x1.5  |  Corrosivos x0.7";
+        bool warn = left < 3f;
+        string tail = warn ? $"   <color=#FFFFFF>¡CAMBIA EN {Mathf.CeilToInt(left)}!</color>" : $"   {Mathf.CeilToInt(left)}s";
+        phaseLabel.text = $"{name}{tail}\n<size=55%>{sub}</size>";
+        phaseLabel.color = c;
+
+        float blink = warn ? 0.5f + 0.5f * Mathf.Sin(Time.time * 14f) : 1f;
+        foreach (var f in frame) f.color = new Color(c.r, c.g, c.b, 0.55f * blink);
+    }
+
+    void UpdatePrompt()
+    {
+        if (promptText == null) return;
+        string t = "";
+        if (injector != null && injector.Target != null && !UIState.Open && !HidePrompt) t = injector.Target.Prompt;
+        promptText.text = t;
     }
 
     string BuildStats(PlayerInventory inv)
@@ -73,17 +120,28 @@ public class CombatHUD : MonoBehaviour
             string mark = (int)inv.Selected == i ? "> " : "   ";
             sb.Append($"{mark}[{i + 1}] {Chemistry.Get((Compound)i).name} x{inv.compounds[i]}\n");
         }
-        if (!any) sb.Append("Sin frascos: mezcla en una estación\n");
+        if (!any) sb.Append("Sin frascos: pulsa R para crear uno\n");
+
+        if (FlaskThrower.Crafting)
+        {
+            int pct = Mathf.RoundToInt(FlaskThrower.CraftProgress * 100f);
+            sb.Append($"Creando frasco... {pct}%\n");
+        }
+        else
+        {
+            var pick = inv.PickCraftable();
+            if (pick != Compound.None) sb.Append($"[R] Crear {Chemistry.Get(pick).name}\n");
+            else sb.Append("[R] Sin reactivos: busca fragmentos o suministros\n");
+        }
 
         sb.Append($"Fórmula Prima: {inv.BossPartCount}/{PlayerInventory.BossPartsTotal}");
         return sb.ToString();
     }
 
-    // ---------- Interfaz construida por código ----------
-
     void BuildUI()
     {
         var cgo = new GameObject("CombatCanvas");
+        canvasGo = cgo;
         cgo.transform.SetParent(transform, false);
 
         var canvas = cgo.AddComponent<Canvas>();
@@ -118,6 +176,41 @@ public class CombatHUD : MonoBehaviour
         hr.anchorMin = Vector2.zero;
         hr.anchorMax = Vector2.one;
         hr.offsetMin = hr.offsetMax = Vector2.zero;
+
+        // Panel de fase (arriba al centro)
+        phaseBg = NewImage("PhaseBg", root, new Color(0f, 0f, 0f, 0.6f));
+        Place(phaseBg.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(520f, 92f));
+        phaseFill = NewImage("PhaseFill", phaseBg.transform, new Color(1f, 0.65f, 0.2f));
+        phaseFillRect = phaseFill.rectTransform;
+        phaseFillRect.anchorMin = new Vector2(0f, 0f);
+        phaseFillRect.anchorMax = new Vector2(1f, 0f);
+        phaseFillRect.pivot = new Vector2(0f, 0f);
+        phaseFillRect.offsetMin = new Vector2(10f, 8f);
+        phaseFillRect.offsetMax = new Vector2(-10f, 20f);
+        phaseLabel = NewText("PhaseLabel", phaseBg.transform, 32, TextAlignmentOptions.Center, Color.white);
+        var pl = phaseLabel.rectTransform;
+        pl.anchorMin = new Vector2(0f, 0f);
+        pl.anchorMax = new Vector2(1f, 1f);
+        pl.offsetMin = new Vector2(0f, 24f);
+        pl.offsetMax = Vector2.zero;
+
+        // Marco de color en los bordes
+        frame = new Image[4];
+        for (int i = 0; i < 4; i++)
+        {
+            frame[i] = NewImage("Marco" + i, root, new Color(1f, 0.65f, 0.2f, 0.5f));
+            var fr2 = frame[i].rectTransform;
+            bool horiz = i < 2;
+            fr2.anchorMin = horiz ? new Vector2(0f, i == 0 ? 1f : 0f) : new Vector2(i == 2 ? 0f : 1f, 0f);
+            fr2.anchorMax = horiz ? new Vector2(1f, i == 0 ? 1f : 0f) : new Vector2(i == 2 ? 0f : 1f, 1f);
+            fr2.pivot = new Vector2(0.5f, 0.5f);
+            fr2.sizeDelta = horiz ? new Vector2(0f, 10f) : new Vector2(10f, 0f);
+            fr2.anchoredPosition = Vector2.zero;
+        }
+
+        // Texto de interacción (solo aparece al mirar algo con lo que se puede interactuar)
+        promptText = NewText("Prompt", root, 30, TextAlignmentOptions.Center, new Color(1f, 0.95f, 0.7f));
+        Place(promptText.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, -90f), new Vector2(1100f, 60f));
 
         takenText = NewText("TakenText", root, 26, TextAlignmentOptions.Left, new Color(1f, 0.35f, 0.35f));
         Place(takenText.rectTransform, Vector2.zero, Vector2.zero, new Vector2(40, 100), new Vector2(420, 36));

@@ -16,7 +16,8 @@ public class PlayerInventory : MonoBehaviour
     public readonly bool[] known = new bool[Chemistry.CompoundCount];
     public readonly bool[] bossParts = new bool[BossPartsTotal];
 
-    public Compound Selected { get; private set; } = Compound.None;
+    public Compound Selected { get; private set; } = Compound.None;    // el que se lanza con clic
+    public Compound Preferred { get; private set; } = Compound.None;  // el que se recarga con R
     public event Action OnChanged;
 
     public int BossPartCount
@@ -32,6 +33,7 @@ public class PlayerInventory : MonoBehaviour
             reagents[i] = startReagents[i];
         foreach (var c in startKnown)
             if (c != Compound.None) known[(int)c] = true;
+        Preferred = Compound.ConcentratedAcid;
     }
 
     public void AddReagent(Reagent r, int n = 1)
@@ -57,7 +59,39 @@ public class PlayerInventory : MonoBehaviour
     {
         compounds[(int)c] += n;
         if (Selected == Compound.None) Selected = c;
+        if (Preferred == Compound.None) Preferred = c;
         OnChanged?.Invoke();
+    }
+
+    // ---------- Recarga rápida (tecla R): crea un frasco sin volver a la estación ----------
+
+    public bool CanCraft(Compound c)
+    {
+        if (c == Compound.None || !known[(int)c]) return false;
+        var (a, b) = Chemistry.RecipeOf(c);
+        return HasReagents(a, b);
+    }
+
+    public bool TryCraft(Compound c)
+    {
+        if (!CanCraft(c)) return false;
+        var (a, b) = Chemistry.RecipeOf(c);
+        reagents[(int)a]--;
+        reagents[(int)b]--;
+        compounds[(int)c]++;
+        Selected = c;
+        Preferred = c;
+        OnChanged?.Invoke();
+        return true;
+    }
+
+    // Si el preferido no se puede crear, busca otro conocido que sí
+    public Compound PickCraftable()
+    {
+        if (CanCraft(Preferred)) return Preferred;
+        for (int i = 0; i < Chemistry.CompoundCount; i++)
+            if (CanCraft((Compound)i)) return (Compound)i;
+        return Compound.None;
     }
 
     public bool TryConsumeSelected(out Compound c)
@@ -66,23 +100,28 @@ public class PlayerInventory : MonoBehaviour
         if (c == Compound.None || compounds[(int)c] <= 0) return false;
 
         compounds[(int)c]--;
+        Preferred = c;                       // R vuelve a crear el que acabas de gastar
         if (compounds[(int)c] == 0)
         {
             Selected = Compound.None;
-            Cycle(1);
+            CycleInternal(1, false);
         }
         OnChanged?.Invoke();
         return true;
     }
 
+    // Teclas 1-6: elige el compuesto aunque no tengas frascos (queda listo para recargar con R)
     public void Select(Compound c)
     {
-        if (c == Compound.None || compounds[(int)c] <= 0) return;
-        Selected = c;
+        if (c == Compound.None || !known[(int)c]) return;
+        Preferred = c;
+        if (compounds[(int)c] > 0) Selected = c;
         OnChanged?.Invoke();
     }
 
-    public void Cycle(int dir)
+    public void Cycle(int dir) => CycleInternal(dir, true);
+
+    void CycleInternal(int dir, bool setPreferred)
     {
         int n = Chemistry.CompoundCount;
         int start = Selected == Compound.None ? -1 : (int)Selected;
@@ -92,6 +131,7 @@ public class PlayerInventory : MonoBehaviour
             if (compounds[i] > 0)
             {
                 Selected = (Compound)i;
+                if (setPreferred) Preferred = Selected;
                 OnChanged?.Invoke();
                 return;
             }
@@ -116,6 +156,15 @@ public class PlayerInventory : MonoBehaviour
         GameFlow.SaveNow();
     }
 
+    // Kit de reaparición: nadie reaparece sin material para pelear
+    public void EnsureMinimum(int acid, int baseR, int cryo)
+    {
+        reagents[0] = Mathf.Max(reagents[0], acid);
+        reagents[1] = Mathf.Max(reagents[1], baseR);
+        reagents[2] = Mathf.Max(reagents[2], cryo);
+        OnChanged?.Invoke();
+    }
+
     public void Restore(int[] r, int[] c, bool[] k, bool[] b, int sel)
     {
         Copy(r, reagents);
@@ -125,7 +174,8 @@ public class PlayerInventory : MonoBehaviour
 
         Selected = Compound.None;
         if (sel >= 0 && sel < compounds.Length && compounds[sel] > 0) Selected = (Compound)sel;
-        else Cycle(1);
+        else CycleInternal(1, false);
+        Preferred = Selected != Compound.None ? Selected : Compound.ConcentratedAcid;
         OnChanged?.Invoke();
     }
 

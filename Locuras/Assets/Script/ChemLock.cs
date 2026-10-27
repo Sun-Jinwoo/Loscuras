@@ -50,17 +50,21 @@ public class ChemLock : MonoBehaviour, IChemTarget, IInteractable
 
         if (e.compound != required)
         {
+            Sfx.PlayAt("lock_fail", transform.position, 0.8f);
             FloatingText.Spawn(above, "Sin reacción", Color.gray, 4f);
             return;
         }
         if (requirePhase && currentPhase != phase)
         {
+            Sfx.PlayAt("lock_fail", transform.position, 0.8f);
             string f = phase == Phase.Amber ? "ÁMBAR" : "AZUL";
             FloatingText.Spawn(above, $"Reacción débil: espera la fase {f}", Color.yellow, 4f);
             return;
         }
 
         MarkSolvedVisual();
+        Sfx.PlayAt("lock_open", transform.position, 1f);
+        Fx.Burst(transform.position + Vector3.up, Color.green, 30, 3f, 0.25f, 1f, -0.2f);
         FloatingText.Spawn(above, "¡Cerradura abierta!", Color.green, 5f);
         if (!string.IsNullOrEmpty(saveId)) SaveSystem.Mark("lock:" + saveId);
 
