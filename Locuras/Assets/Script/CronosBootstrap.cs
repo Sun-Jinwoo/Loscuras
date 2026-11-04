@@ -52,9 +52,9 @@ public static class CronosBootstrap
         var root = new GameObject("CronosRuntime");
         root.AddComponent<AudioDirector>();
         root.AddComponent<PhasePostFx>();
-        root.AddComponent<TeaserTools>();
-        root.AddComponent<TeaserDirector>();   // TEMPORAL: tecla K graba el teaser automático (borra TeaserDirector.cs al terminar)
-
+        root.AddComponent<MenuUI>();            // menú principal con arte
+        root.AddComponent<InventoryWheel>();    // inventario en rueda
+       
         SoraDrone.Create().transform.SetParent(root.transform);
 
         var cam = Camera.main;

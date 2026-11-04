@@ -109,18 +109,7 @@ public class CombatHUD : MonoBehaviour
 
     string BuildStats(PlayerInventory inv)
     {
-        sb.Clear();
-        sb.Append($"Ácido {inv.reagents[0]}   Base {inv.reagents[1]}   Crio {inv.reagents[2]}\n");
-
-        bool any = false;
-        for (int i = 0; i < Chemistry.CompoundCount; i++)
-        {
-            if (inv.compounds[i] <= 0) continue;
-            any = true;
-            string mark = (int)inv.Selected == i ? "> " : "   ";
-            sb.Append($"{mark}[{i + 1}] {Chemistry.Get((Compound)i).name} x{inv.compounds[i]}\n");
-        }
-        if (!any) sb.Append("Sin frascos: pulsa R para crear uno\n");
+        sb.Clear();   // reactivos y compuestos ahora los muestra InventoryWheel
 
         if (FlaskThrower.Crafting)
         {
@@ -216,7 +205,7 @@ public class CombatHUD : MonoBehaviour
         Place(takenText.rectTransform, Vector2.zero, Vector2.zero, new Vector2(40, 100), new Vector2(420, 36));
 
         statsText = NewText("StatsText", root, 22, TextAlignmentOptions.BottomRight, Color.white);
-        Place(statsText.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-40, 60), new Vector2(620, 240));
+        Place(statsText.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-290, 40), new Vector2(520, 120));
     }
 
     Image NewImage(string objName, Transform parent, Color color)

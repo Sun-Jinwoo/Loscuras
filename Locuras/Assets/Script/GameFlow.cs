@@ -14,6 +14,23 @@ public class GameFlow : MonoBehaviour
     public static event System.Action<string> HintShown;   // SORA reacciona (dron, sonido)
     public State Current { get; private set; } = State.Menu;
 
+    // ---- API para MenuUI (menú con arte) ----
+    public bool InMenu => Current == State.Menu;
+    public bool MenuMainPage => page == Page.Main;
+    public bool HasSave => hasSave;
+    public void UI_NewGame() { if (Current == State.Menu) newGameRequested = true; }
+    public void UI_Continue() { if (Current == State.Menu && hasSave) continueRequested = true; }
+    public void UI_Settings() { if (Current == State.Menu) page = Page.Settings; }
+    public void UI_Credits() { if (Current == State.Menu) page = Page.Credits; }
+    public void UI_Quit()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
     [SerializeField] float autosaveEvery = 20f;
     [SerializeField] float minHealthToAutosave = 0.35f;
 
@@ -568,6 +585,8 @@ public class GameFlow : MonoBehaviour
 
     void DrawMenu()
     {
+        // Con MenuUI activo, la página principal la dibuja el Canvas (no el OnGUI).
+        if (MenuUI.Active && page == Page.Main) return;
         DrawBackdrop();
         float w = 520f;
         GUILayout.BeginArea(new Rect((vw - w) / 2f, 50f, w, vh - 80f));
@@ -651,6 +670,7 @@ public class GameFlow : MonoBehaviour
         if (fs != Screen.fullScreen) Screen.fullScreen = fs;
 
         GUILayout.FlexibleSpace();
+        if (Btn("Ver controles", 44f)) page = Page.Controls;
         if (Btn("Volver", 52f)) BackToMain();
     }
 
