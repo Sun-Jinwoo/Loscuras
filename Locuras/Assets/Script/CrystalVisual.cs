@@ -172,7 +172,13 @@ public class CrystalVisual : MonoBehaviour
     float CurrentYaw()
     {
         string k = enemy != null ? enemy.ModelKey : "x";
-        if (PlayerPrefs.HasKey(YawKey(k))) return PlayerPrefs.GetFloat(YawKey(k));
+        if (ModelYawTable.TryGet(k, out float saved)) return saved;            // tabla del proyecto (viaja al build)
+        if (PlayerPrefs.HasKey(YawKey(k)))                                      // calibración vieja del editor: se migra a la tabla
+        {
+            float old = PlayerPrefs.GetFloat(YawKey(k));
+            ModelYawTable.Set(k, old);
+            return old;
+        }
         return AutoYaw();
     }
 
@@ -198,6 +204,7 @@ public class CrystalVisual : MonoBehaviour
         float next = Mathf.Repeat(cur + deg + 180f, 360f) - 180f;
         PlayerPrefs.SetFloat(YawKey(k), next);
         PlayerPrefs.Save();
+        ModelYawTable.Set(k, next);
         yawVersion++;
         return next;
     }
@@ -217,6 +224,9 @@ public class CrystalVisual : MonoBehaviour
         return best;
     }
 
+#if UNITY_EDITOR
+    static readonly System.Collections.Generic.HashSet<string> loggedKeys = new System.Collections.Generic.HashSet<string>();
+#endif
     string pSpeed, pMoveBool, pStun, pAttack, pHit;
     int sIdle, sMove, sAttack, sHit;       // hashes de estados (0 = no existe)
     bool hasLocomotion;                    // true si hay animación real de movimiento
@@ -259,7 +269,14 @@ public class CrystalVisual : MonoBehaviour
     {
         pSpeed = pMoveBool = pStun = pAttack = pHit = null;
         sIdle = sMove = sAttack = sHit = 0; hasLocomotion = false;
-        if (anim == null || anim.runtimeAnimatorController == null) return;
+        if (anim == null || anim.runtimeAnimatorController == null)
+        {
+#if UNITY_EDITOR
+            string nk = enemy != null ? enemy.ModelKey : "?";
+            if (loggedKeys.Add(nk)) Debug.LogWarning($"[Animación] {nk}: el modelo NO tiene Animator Controller, por eso se ve rígido. Usa el menú Cronos > Monstruos > Crear animador (selección).");
+#endif
+            return;
+        }
 
         foreach (var p in anim.parameters)
         {
@@ -283,6 +300,11 @@ public class CrystalVisual : MonoBehaviour
 
         hasLocomotion = pSpeed != null || pMoveBool != null || sMove != 0;
         if (anim != null) anim.speed = 1f;
+#if UNITY_EDITOR
+        string dk = enemy != null ? enemy.ModelKey : "?";
+        if (loggedKeys.Add(dk))
+            Debug.Log($"[Animación] {dk}: controlador='{anim.runtimeAnimatorController.name}' · velocidad={(pSpeed ?? "no")} · ataque={(pAttack ?? (sAttack != 0 ? "estado" : "NO"))} · golpe={(pHit ?? (sHit != 0 ? "estado" : "NO"))} · idle={(sIdle != 0 ? "sí" : "NO")} · mover={(sMove != 0 ? "sí" : "NO")} · humanoide={anim.isHuman}");
+#endif
     }
 
     void AnimateModel(float speed)
@@ -293,7 +315,7 @@ public class CrystalVisual : MonoBehaviour
 
         if (anim != null)
         {
-            if (pSpeed != null) anim.SetFloat(pSpeed, speed);
+            if (pSpeed != null) anim.SetFloat(pSpeed, speed, 0.12f, Time.deltaTime);   // suavizado: sin saltos bruscos entre quieto y caminar
             if (pMoveBool != null) anim.SetBool(pMoveBool, moving);
             if (pStun != null) anim.SetBool(pStun, stunned);
             SetParam("Speed", speed); SetParam("Stunned", stunned);
@@ -304,34 +326,70 @@ public class CrystalVisual : MonoBehaviour
                 int want = moving && !stunned ? sMove : (sIdle != 0 ? sIdle : sMove);
                 if (want != curState) { anim.CrossFadeInFixedTime(want, 0.2f); curState = want; }
             }
-            anim.speed = stunned ? 0f : (moving && hasLocomotion ? Mathf.Clamp(speed / 2.5f, 0.8f, 1.6f) : 1f);
+            anim.speed = stunned ? 0f : (moving && hasLocomotion ? Mathf.Clamp(speed / 3.2f, 0.85f, 1.7f) : 1f);
         }
 
-        // Si no hay animación real de movimiento: balanceo procedural para que no se deslice tieso
+        // Capa procedural encima de la animación: inclinación, vaivén, respiración,
+        // anticipación + estocada al atacar y retroceso al recibir un golpe.
         var mt = model.transform;
         mt.position -= bobOffset;
         bobOffset = Vector3.zero;
         mt.localRotation = baseRot;
         mt.localScale = baseScaleM;
-        if (!hasLocomotion)
+
+        float dt = Time.deltaTime;
+        spSmooth = Mathf.Lerp(spSmooth, speed, 1f - Mathf.Exp(-8f * dt));
+        float t = Time.time + phase;
+        float k = Mathf.Clamp01(spSmooth / 2.5f);
+        float amp = hasLocomotion ? 0.55f : 1f;            // con animación real el efecto es más sutil
+        float f = 6f + spSmooth * 1.4f;
+        float step = Mathf.Abs(Mathf.Sin(t * f));
+        float bob = step * 0.1f * k * amp + Mathf.Sin(t * 1.6f) * 0.03f;
+        float pitch = k * 9f * amp;
+        float roll = Mathf.Sin(t * f * 0.5f) * 5f * k * amp;
+        float yaw = Mathf.Sin(t * f * 0.5f + 1f) * 4f * k * amp;
+        float sx = 1f, sy = 1f + Mathf.Sin(t * 2f) * 0.018f;
+        Vector3 fwd = transform.root.forward;
+        Vector3 push = Vector3.zero;
+
+        if (attackT >= 0f)
         {
-            float t = Time.time + phase;
-            float k = Mathf.Clamp01(speed / 2f);
-            float f = 7f + speed * 1.5f;
-            float step = Mathf.Abs(Mathf.Sin(t * f));
-            bobOffset = new Vector3(0f, (step * 0.12f * k + Mathf.Sin(t * 1.6f) * 0.03f), 0f);
-            mt.position += bobOffset;
-            mt.localRotation = baseRot * Quaternion.Euler(k * 7f, 0f, Mathf.Sin(t * f * 0.5f) * 5f * k);
-            float breathe = 1f + Mathf.Sin(t * 2f) * 0.02f;
-            mt.localScale = baseScaleM * breathe;
-            if (attackKick > 0f)
+            attackT += dt;
+            float a = attackT;
+            if (a < 0.35f)                      // anticipación: se echa hacia atrás
             {
-                attackKick = Mathf.MoveTowards(attackKick, 0f, Time.deltaTime * 4f);
-                float kick = Mathf.Sin(attackKick * Mathf.PI);
-                mt.localRotation = baseRot * Quaternion.Euler(kick * 25f, 0f, 0f);
+                float u = a / 0.35f; u = u * u * (3f - 2f * u);
+                pitch -= 14f * u; sy += 0.05f * u; push -= fwd * 0.18f * u;
             }
+            else if (a < 0.55f)                 // estocada
+            {
+                float u = (a - 0.35f) / 0.2f;
+                pitch += Mathf.Lerp(-14f, 26f, u); push += fwd * Mathf.Lerp(-0.18f, 0.55f, u);
+                sy -= 0.08f * Mathf.Sin(u * Mathf.PI); sx += 0.06f * Mathf.Sin(u * Mathf.PI);
+            }
+            else if (a < 0.85f)                 // recupera
+            {
+                float u = (a - 0.55f) / 0.3f;
+                pitch += Mathf.Lerp(26f, 0f, u); push += fwd * Mathf.Lerp(0.55f, 0f, u);
+            }
+            else attackT = -1f;
         }
+
+        if (recoil > 0f)                        // retroceso al recibir daño
+        {
+            recoil = Mathf.MoveTowards(recoil, 0f, dt * 4.5f);
+            pitch -= 10f * recoil; roll += Mathf.Sin(Time.time * 60f) * 6f * recoil; push -= fwd * 0.22f * recoil;
+            sy -= 0.05f * recoil;
+        }
+        if (stunned) { roll += Mathf.Sin(Time.time * 35f) * 4f; yaw += Mathf.Sin(Time.time * 27f) * 3f; }
+
+        bobOffset = new Vector3(0f, bob, 0f) + push;
+        mt.position += bobOffset;
+        // La rotación va a la IZQUIERDA para inclinar en el eje del enemigo, no en el del modelo (que puede mirar de lado)
+        mt.localRotation = Quaternion.Euler(pitch, yaw, roll) * baseRot;
+        mt.localScale = new Vector3(baseScaleM.x * sx, baseScaleM.y * sy, baseScaleM.z * sx);
     }
+    float spSmooth, attackT = -1f, recoil;
     int curState;
 
 
@@ -390,6 +448,7 @@ public class CrystalVisual : MonoBehaviour
     public void Flash()
     {
         flash = 1f;
+        recoil = 1f;
         if (anim == null) return;
         if (pHit != null) anim.SetTrigger(pHit);
         else if (sHit != 0 && Time.time > attackUntil) { anim.CrossFadeInFixedTime(sHit, 0.05f); hitUntil = Time.time + 0.4f; curState = sHit; }
@@ -398,6 +457,7 @@ public class CrystalVisual : MonoBehaviour
     public void AttackKick()
     {
         attackKick = 1f;
+        attackT = 0f;
         if (anim == null) return;
         if (pAttack != null) anim.SetTrigger(pAttack);
         else if (sAttack != 0) { anim.CrossFadeInFixedTime(sAttack, 0.08f); attackUntil = Time.time + 0.9f; curState = sAttack; }

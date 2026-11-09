@@ -19,6 +19,13 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
     [SerializeField] float aggroRange = 11f;
     [SerializeField] float bossAggroRange = 16f;
     [SerializeField] float loseSightSeconds = 4f;
+    [Header("Ajuste de sensación (valores nuevos; no dependen del prefab viejo)")]
+    [SerializeField] float speedScale = 1.35f;      // multiplica la velocidad de ámbar/azul
+    [SerializeField] float minBlueRatio = 0.7f;     // en azul nunca va por debajo de este % de la velocidad de ámbar
+    [SerializeField] float extraReach = 1.1f;       // alcance extra del golpe (antes había que estar pegado)
+    [SerializeField] float attackInterval = 1.1f;   // segundos entre golpes
+    [SerializeField] float windup = 0.35f;          // tiempo de preparación (se ve y da chance de esquivar)
+    [SerializeField] float turnSpeed = 480f;        // grados por segundo para girar hacia ti
 
     [Header("Mini jefe / jefe final")]
     [SerializeField] int bossPartIndex = -1;
@@ -29,6 +36,8 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
     [Header("Guardado")]
     [SerializeField] string saveId = "";
 
+    public static event System.Action<float, bool> OnChemHit;   // (multiplicador, ¿murió?) para el marcador de impacto
+
     public static int AggroCount { get; private set; }
     public static int BossAggroCount { get; private set; }
 
@@ -38,6 +47,16 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
     public CrystalType Type => type;
     // Clave del tipo de modelo (la usa la calibración de giro de CrystalVisual)
     public string ModelKey => (isFinalBoss ? "Jefe_Final" : (IsBoss ? "Jefe_" : "Enemigo_") + (type == CrystalType.Saline ? "Salino" : "Calido"));
+    public bool IsAlive => !dead;
+    public string DisplayName => isFinalBoss ? "Residuo Cronos" : (IsBoss ? "Guardián " : "Cristal ") + (type == CrystalType.Saline ? "Salino" : "Cálido");
+    // Multiplicador que tendría un compuesto contra este enemigo ahora mismo (0 = no hace daño directo)
+    public float PreviewMultiplier(ChemEffect e, Phase phase)
+    {
+        if (e.damage <= 0f && e.cloudDps <= 0f) return 0f;
+        float m = TypeMultiplier(e.type) * Chemistry.PhaseMultiplier(e.type, phase);
+        if (vulnerableTo != Compound.None && e.compound == vulnerableTo) m *= vulnerableMultiplier;
+        return m;
+    }
     public bool IsStunned => Time.time < stunUntil;
     public bool IsSlowed => Time.time < slowUntil;
     public float HealthRatio => maxHealth > 0f ? Mathf.Clamp01(health / maxHealth) : 0f;
@@ -89,9 +108,10 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
         health = maxHealth;
 
         agent = GetComponent<NavMeshAgent>();
-        agent.stoppingDistance = attackRange * Mathf.Max(1f, transform.localScale.x) * 0.7f;
-        agent.acceleration = 14f;
+        agent.stoppingDistance = (attackRange * Mathf.Max(1f, transform.localScale.x) + extraReach) * 0.7f;
+        agent.acceleration = 24f;
         agent.angularSpeed = 360f;
+        agent.updateRotation = false;   // el giro lo controla este script (siempre mira hacia ti)
         agent.autoBraking = true;
         // Los enemigos no se atraviesan entre sí
         agent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
@@ -124,7 +144,7 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
     {
         if (dead || player == null || clock == null || agent == null || !agent.isOnNavMesh) return;
 
-        if (Time.time < stunUntil) { agent.isStopped = true; return; }
+        if (Time.time < stunUntil) { agent.isStopped = true; windingUp = false; return; }
 
         Vector3 to = player.position - transform.position;
         to.y = 0f;
@@ -141,12 +161,24 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
         SetAggro(Time.time - lastSeen < loseSightSeconds && dist <= range * 1.6f);
         if (!aggro) { agent.isStopped = true; return; }
 
-        float speed = clock.CurrentPhase == Phase.Amber ? amberSpeed : blueSpeed;
-        if (Time.time < slowUntil) speed *= 0.3f;
+        float ambar = amberSpeed * speedScale;
+        float speed = clock.CurrentPhase == Phase.Amber ? ambar : Mathf.Max(blueSpeed * speedScale, ambar * minBlueRatio);
+        if (Time.time < slowUntil) speed *= 0.35f;
         agent.speed = speed;
 
-        float reach = attackRange * Mathf.Max(1f, transform.localScale.x);   // los jefes grandes alcanzan más
-        if (dist > reach)
+        float reach = attackRange * Mathf.Max(1f, transform.localScale.x) + extraReach;   // los jefes grandes alcanzan más
+
+        // Giro: siempre hacia ti si te ve (aunque te pongas a su espalda); si no, hacia donde camina
+        Vector3 face = to;
+        if (!seesPlayer && agent.desiredVelocity.sqrMagnitude > 0.05f) { face = agent.desiredVelocity; face.y = 0f; }
+        if (face.sqrMagnitude > 0.0001f)
+        {
+            var want = Quaternion.LookRotation(face.normalized, Vector3.up);
+            float ts = turnSpeed * (windingUp ? 0.35f : 1f);   // mientras prepara el golpe gira más lento
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, want, ts * Time.deltaTime);
+        }
+
+        if (dist > reach * 0.9f && !windingUp)
         {
             agent.isStopped = false;
             if (Time.time >= nextPath)
@@ -158,17 +190,28 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
         else
         {
             agent.isStopped = true;
-            if (dist > 0.01f)
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(to / dist), 10f * Time.deltaTime);
-            if (playerHealth != null) playerHealth.TakeDamage(contactDps * Time.deltaTime);
-            if (Time.time >= nextAttackSfx)
+            // Ataque en dos tiempos: prepara (windup) y golpea. Si te alejas en ese lapso, falla.
+            if (!windingUp && Time.time >= nextAttack && dist <= reach)
             {
-                nextAttackSfx = Time.time + 0.9f;
+                windingUp = true;
+                strikeAt = Time.time + windup;
+                nextAttack = Time.time + attackInterval;
                 Sfx.PlayAt("enemy_attack", transform.position, 0.8f, Random.Range(0.9f, 1.1f));
                 if (visual != null) visual.AttackKick();
             }
+            if (windingUp && Time.time >= strikeAt)
+            {
+                windingUp = false;
+                Vector3 now = player.position - transform.position; now.y = 0f;
+                bool inFront = Vector3.Dot(transform.forward, now.normalized) > 0.2f;
+                if (now.magnitude <= reach * 1.25f && inFront && playerHealth != null)
+                    playerHealth.TakeDamage(contactDps * attackInterval);
+            }
         }
     }
+
+    bool windingUp;
+    float strikeAt, nextAttack;
 
     Transform FirstModelRoot()
     {
@@ -208,6 +251,7 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
             float dmg = e.damage * mult;
             health -= dmg;
             bar.SetRatio(health / maxHealth);
+            OnChemHit?.Invoke(mult, health <= 0f);
 
             string label = "-" + Mathf.RoundToInt(dmg);
             Color col = Color.white;

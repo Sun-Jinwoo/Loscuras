@@ -150,7 +150,8 @@ public class CombatHUD : MonoBehaviour
         fr.anchorMax = Vector2.one;
         fr.offsetMin = fr.offsetMax = Vector2.zero;
 
-        var bg = NewImage("HpBg", root, new Color(0f, 0f, 0f, 0.65f));
+        var bg = NewImage("HpBg", root, new Color(0.04f, 0.05f, 0.07f, 0.85f));
+        Bronze(bg);
         Place(bg.rectTransform, Vector2.zero, Vector2.zero, new Vector2(40, 60), new Vector2(420, 34));
 
         fillImage = NewImage("HpFill", bg.transform, Color.green);
@@ -167,7 +168,8 @@ public class CombatHUD : MonoBehaviour
         hr.offsetMin = hr.offsetMax = Vector2.zero;
 
         // Panel de fase (arriba al centro)
-        phaseBg = NewImage("PhaseBg", root, new Color(0f, 0f, 0f, 0.6f));
+        phaseBg = NewImage("PhaseBg", root, new Color(0.04f, 0.05f, 0.07f, 0.82f));
+        Bronze(phaseBg);
         Place(phaseBg.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(520f, 92f));
         phaseFill = NewImage("PhaseFill", phaseBg.transform, new Color(1f, 0.65f, 0.2f));
         phaseFillRect = phaseFill.rectTransform;
@@ -206,6 +208,14 @@ public class CombatHUD : MonoBehaviour
 
         statsText = NewText("StatsText", root, 22, TextAlignmentOptions.BottomRight, Color.white);
         Place(statsText.rectTransform, new Vector2(1, 0), new Vector2(1, 0), new Vector2(-290, 40), new Vector2(520, 120));
+    }
+
+    // Borde de bronce (mismo estilo que las placas del menú)
+    void Bronze(Image img)
+    {
+        var o = img.gameObject.AddComponent<Outline>();
+        o.effectColor = new Color(0.76f, 0.54f, 0.26f, 0.95f);
+        o.effectDistance = new Vector2(3f, -3f);
     }
 
     Image NewImage(string objName, Transform parent, Color color)

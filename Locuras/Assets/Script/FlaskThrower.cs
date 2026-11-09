@@ -6,6 +6,8 @@ using UnityEngine.InputSystem;
 public class FlaskThrower : MonoBehaviour
 {
     public static event Action OnThrown;
+    public static event Action OnDryFire;               // clic o R sin poder hacerlo
+    public static event Action<Compound> OnCrafted;     // frasco creado con R
     public static float CraftProgress { get; private set; }   // 0 = sin crear, 0..1 mientras se crea
     public static bool Crafting { get; private set; }
     public static bool DemoCraft;                              // lo usa TeaserDirector (equivale a pulsar R)
@@ -57,6 +59,7 @@ public class FlaskThrower : MonoBehaviour
             if (target == Compound.None)
             {
                 Sfx.Play("ui_error");
+                OnDryFire?.Invoke();
                 GameFlow.Hint("No tienes reactivos suficientes para crear un frasco. Recoge reactivos o usa un dispensador.", 3f);
             }
             else
@@ -75,7 +78,7 @@ public class FlaskThrower : MonoBehaviour
             {
                 Crafting = false;
                 CraftProgress = 0f;
-                if (inv.TryCraft(craftTarget)) Sfx.Play("mix_success", 0.8f);
+                if (inv.TryCraft(craftTarget)) { Sfx.Play("mix_success", 0.8f); OnCrafted?.Invoke(craftTarget); }
             }
         }
 
@@ -85,6 +88,7 @@ public class FlaskThrower : MonoBehaviour
             if (!inv.TryConsumeSelected(out var c))
             {
                 Sfx.Play("ui_error", 0.6f);
+                OnDryFire?.Invoke();
                 return;
             }
             nextThrow = Time.time + cooldown;

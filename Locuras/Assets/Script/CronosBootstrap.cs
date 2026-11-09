@@ -54,7 +54,11 @@ public static class CronosBootstrap
         root.AddComponent<PhasePostFx>();
         root.AddComponent<MenuUI>();            // menú principal con arte
         root.AddComponent<InventoryWheel>();    // inventario en rueda
-       
+        root.AddComponent<GameHUD>();           // mira, feedback de impacto y aviso de fase
+#if UNITY_EDITOR
+        root.AddComponent<EnemyYawTool>();      // RePág/AvPág/Inicio: corregir hacia dónde mira un enemigo
+#endif
+
         SoraDrone.Create().transform.SetParent(root.transform);
 
         var cam = Camera.main;
