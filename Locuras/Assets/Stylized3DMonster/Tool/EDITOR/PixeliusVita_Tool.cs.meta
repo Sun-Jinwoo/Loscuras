@@ -14,5 +14,5 @@ AssetOrigin:
   productId: 373148
   packageName: '[FreeTrial] 30 Monster Stylized Fantasy Vol 01 (Rig +Anim) - PixeliusVita'
   packageVersion: 1.0
-  assetPath: Assets/Stylized3DMonster/Tool/PixeliusVita_Tool.cs
+  assetPath: Assets/Stylized3DMonster/Tool/EDITOR/PixeliusVita_Tool.cs
   uploadId: 975048
