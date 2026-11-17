@@ -47,6 +47,8 @@ public class Pickup : MonoBehaviour, IInteractable
     {
         var r = GetComponent<Renderer>();
         if (r == null) return;
+        // Las notas ya no son un cubo: se oculta el modelo y las señala un "!" flotante (ver SetupMarker)
+        if (kind == Kind.Note) { r.enabled = false; return; }
         Color c = kind == Kind.Reagent ? Chemistry.ReagentColors[(int)reagent]
                 : kind == Kind.BossPart ? new Color(1f, 0.85f, 0.2f)
                 : new Color(1f, 1f, 0.8f);
@@ -73,8 +75,25 @@ public class Pickup : MonoBehaviour, IInteractable
         ApplyLook();
     }
 
+    void SetupMarker()
+    {
+        switch (kind)
+        {
+            case Kind.Note:
+                WorldMarker.Spawn(transform, IconKind.Bang, new Color(1f, 0.82f, 0.3f), 1.15f, 0.9f, 20f);
+                break;
+            case Kind.BossPart:
+                WorldMarker.Spawn(transform, IconKind.Diamond, new Color(1f, 0.85f, 0.2f), 1.5f, 1.3f, 60f);
+                break;
+            default:
+                WorldMarker.Spawn(transform, IconKind.Drop, Chemistry.ReagentColors[(int)reagent], 0.55f, 0.6f, 9f);
+                break;
+        }
+    }
+
     void Start()
     {
+        SetupMarker();
         basePos = transform.position;
         if (lifetime > 0f) Destroy(gameObject, lifetime);
     }
@@ -82,7 +101,7 @@ public class Pickup : MonoBehaviour, IInteractable
     void Update()
     {
         transform.position = basePos + Vector3.up * Mathf.Sin(Time.time * 2f) * 0.12f;
-        transform.Rotate(0f, 90f * Time.deltaTime, 0f, Space.World);
+        if (kind != Kind.Note) transform.Rotate(0f, 90f * Time.deltaTime, 0f, Space.World);
     }
 
     public void Interact(Injector user)
@@ -99,7 +118,7 @@ public class Pickup : MonoBehaviour, IInteractable
             case Kind.Note:
                 bool learned = inv.Learn(reveals);
                 string n = reveals != Compound.None ? Chemistry.Get(reveals).name : null;
-                GameFlow.ShowNote(noteTitle, noteText, learned ? n : null);
+                GameFlow.ShowNote(noteTitle, noteText, learned ? n : null, reveals);
                 break;
         }
 

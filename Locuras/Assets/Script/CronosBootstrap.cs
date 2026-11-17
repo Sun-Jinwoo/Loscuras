@@ -55,6 +55,9 @@ public static class CronosBootstrap
         root.AddComponent<MenuUI>();            // menú principal con arte
         root.AddComponent<InventoryWheel>();    // inventario en rueda
         root.AddComponent<GameHUD>();           // mira, feedback de impacto y aviso de fase
+        root.AddComponent<PauseUI>();           // pausa, opciones, notas y avisos en Canvas
+        root.AddComponent<MapSignals>();        // marcadores en el mapa
+        root.AddComponent<Wayfinding>();        // objetivo en pantalla
 #if UNITY_EDITOR
         root.AddComponent<EnemyYawTool>();      // RePág/AvPág/Inicio: corregir hacia dónde mira un enemigo
 #endif

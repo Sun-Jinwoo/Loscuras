@@ -14,6 +14,20 @@ public class GameFlow : MonoBehaviour
     public static event System.Action<string> HintShown;   // SORA reacciona (dron, sonido)
     public State Current { get; private set; } = State.Menu;
 
+    // ---- API para PauseUI (pausa/notas/avisos en Canvas) ----
+    public static System.Func<bool> EscapeHandler;   // PauseUI: Esc dentro de una subpágina vuelve atrás
+    public string HintText => hintText;
+    public float HintUntil => hintUntil;
+    public string NoteTitle => noteTitle;
+    public string NoteBody => noteBody;
+    public string NoteLearned => noteLearned;
+    public Compound NoteReveals => noteReveals;
+    public float PlayTime => playTime;
+    public void UI_Resume() { if (Current == State.Paused) pending = State.Playing; }
+    public void UI_Save() { if (Current == State.Paused) saveRequested = true; }
+    public void UI_MainMenu() { if (Current == State.Paused) menuRequested = true; }
+    public void UI_CloseNote() { if (Current == State.Note && Time.frameCount != noteOpenFrame) pending = State.Playing; }
+
     // ---- API para MenuUI (menú con arte) ----
     public bool InMenu => Current == State.Menu;
     public bool MenuMainPage => page == Page.Main;
@@ -56,6 +70,7 @@ public class GameFlow : MonoBehaviour
     string hintText = "";
     float hintUntil;
     string noteTitle = "", noteBody = "", noteLearned;
+    Compound noteReveals = Compound.None;
     int noteOpenFrame;
     float playTime, saveTimer;
     bool hasSave;
@@ -182,12 +197,13 @@ public class GameFlow : MonoBehaviour
         HintShown?.Invoke(text);
     }
 
-    public static void ShowNote(string title, string text, string learnedName)
+    public static void ShowNote(string title, string text, string learnedName, Compound reveals = Compound.None)
     {
         if (Instance == null) return;
         Instance.noteTitle = title;
         Instance.noteBody = text;
         Instance.noteLearned = learnedName;
+        Instance.noteReveals = reveals;
         Instance.noteOpenFrame = Time.frameCount;
         Instance.SetState(State.Note);
         SaveNow();
@@ -443,7 +459,8 @@ public class GameFlow : MonoBehaviour
             case State.Paused:
                 if (kb.escapeKey.wasPressedThisFrame)
                 {
-                    if (page != Page.Main) BackToMain();
+                    if (EscapeHandler != null && EscapeHandler()) { }
+                    else if (page != Page.Main) BackToMain();
                     else SetState(State.Playing);
                 }
                 break;
@@ -532,7 +549,7 @@ public class GameFlow : MonoBehaviour
         vw = Screen.width / k;
         vh = Screen.height / k;
 
-        if (Current == State.Playing && Time.unscaledTime < hintUntil && !string.IsNullOrEmpty(hintText))
+        if (!PauseUI.Active && Current == State.Playing && Time.unscaledTime < hintUntil && !string.IsNullOrEmpty(hintText))
         {
             float w = Mathf.Min(900f, vw - 40f);
             var r = new Rect((vw - w) / 2f, 96f, w, 84f);
@@ -544,10 +561,10 @@ public class GameFlow : MonoBehaviour
         {
             case State.Menu: DrawMenu(); break;
             case State.Intro: DrawIntro(); break;
-            case State.Paused: DrawPause(); break;
+            case State.Paused: if (!PauseUI.Active) DrawPause(); break;
             case State.Dead: DrawDead(); break;
             case State.Victory: DrawVictory(); break;
-            case State.Note: DrawNote(); break;
+            case State.Note: if (!PauseUI.Active) DrawNote(); break;
         }
         GUI.matrix = Matrix4x4.identity;
     }

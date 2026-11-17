@@ -345,32 +345,32 @@ public class MixStation : MonoBehaviour, IInteractable
         {
             int idx = i;
             float x = -640f + i * 215f;
-            var b = MakeBtn("Reactivo" + i, panel, new Vector2(x, 235f), new Vector2(190f, 270f), () => PickReagent(idx), null);
-            b.glow = Img("Brillo", b.rt, sprSoft, Vector2.zero, new Vector2(300f, 380f), new Color(1, 1, 1, 0.2f));
+            var b = MakeBtn("Reactivo" + i, panel, new Vector2(x, 212f), new Vector2(190f, 250f), () => PickReagent(idx), null);
+            b.glow = Img("Brillo", b.rt, sprSoft, Vector2.zero, new Vector2(300f, 350f), new Color(1, 1, 1, 0.2f));
             b.glow.rectTransform.SetSiblingIndex(0);
-            b.bg = Img("Fondo", b.rt, sprPanel, Vector2.zero, new Vector2(190f, 270f), new Color(0.07f, 0.09f, 0.12f, 0.95f)); b.bg.type = Image.Type.Sliced;
+            b.bg = Img("Fondo", b.rt, sprPanel, Vector2.zero, new Vector2(190f, 250f), new Color(0.07f, 0.09f, 0.12f, 0.95f)); b.bg.type = Image.Type.Sliced;
             b.bg.rectTransform.SetSiblingIndex(1);
-            reagentLiquid[i] = Img("Liquido", b.rt, sprLiquid, new Vector2(0, 28f), new Vector2(150f, 150f), Chemistry.ReagentColors[i]);
+            reagentLiquid[i] = Img("Liquido", b.rt, sprLiquid, new Vector2(0, 22f), new Vector2(140f, 140f), Chemistry.ReagentColors[i]);
             reagentLiquid[i].type = Image.Type.Filled; reagentLiquid[i].fillMethod = Image.FillMethod.Vertical; reagentLiquid[i].fillOrigin = 0;
-            Img("Vidrio", b.rt, sprGlass, new Vector2(0, 28f), new Vector2(150f, 150f), Color.white);
-            Txt("Nombre", b.rt, Chemistry.ReagentNames[i], 30, new Vector2(0, -78f), new Vector2(180f, 36f), Chemistry.ReagentColors[i]).fontStyle = FontStyles.Bold;
-            reagentCount[i] = Txt("Cant", b.rt, "x0", 30, new Vector2(0, -112f), new Vector2(180f, 36f), Color.white);
-            Txt("Tecla", b.rt, "[" + keys[i] + "]", 20, new Vector2(-62f, 112f), new Vector2(50f, 28f), new Color(1, 1, 1, 0.55f));
+            Img("Vidrio", b.rt, sprGlass, new Vector2(0, 22f), new Vector2(140f, 140f), Color.white);
+            Txt("Nombre", b.rt, Chemistry.ReagentNames[i], 30, new Vector2(0, -68f), new Vector2(180f, 36f), Chemistry.ReagentColors[i]).fontStyle = FontStyles.Bold;
+            reagentCount[i] = Txt("Cant", b.rt, "x0", 30, new Vector2(0, -102f), new Vector2(180f, 36f), Color.white);
+            Txt("Tecla", b.rt, "[" + keys[i] + "]", 20, new Vector2(-62f, 98f), new Vector2(50f, 28f), new Color(1, 1, 1, 0.55f));
             reagentBtn[i] = b;
         }
 
         // ranuras A y B y matraz central
-        slotAGlow = Img("BrilloA", panel, sprSoft, new Vector2(-640f, -30f), new Vector2(190f, 190f), new Color(1, 1, 1, 0.12f));
-        Img("RanuraA", panel, sprRing, new Vector2(-640f, -30f), new Vector2(120f, 120f), new Color(0.78f, 0.56f, 0.27f, 0.9f));
-        slotAImg = Img("IconoA", panel, sprLiquid, new Vector2(-640f, -30f), new Vector2(96f, 96f), Color.clear);
-        slotBGlow = Img("BrilloB", panel, sprSoft, new Vector2(-220f, -30f), new Vector2(190f, 190f), new Color(1, 1, 1, 0.12f));
-        Img("RanuraB", panel, sprRing, new Vector2(-220f, -30f), new Vector2(120f, 120f), new Color(0.78f, 0.56f, 0.27f, 0.9f));
-        slotBImg = Img("IconoB", panel, sprLiquid, new Vector2(-220f, -30f), new Vector2(96f, 96f), Color.clear);
-        Txt("A", panel, "A", 26, new Vector2(-640f, -108f), new Vector2(40, 30), new Color(1, 1, 1, 0.5f));
-        Txt("B", panel, "B", 26, new Vector2(-220f, -108f), new Vector2(40, 30), new Color(1, 1, 1, 0.5f));
+        slotAGlow = Img("BrilloA", panel, sprSoft, new Vector2(-640f, -62f), new Vector2(190f, 190f), new Color(1, 1, 1, 0.12f));
+        Img("RanuraA", panel, sprRing, new Vector2(-640f, -62f), new Vector2(120f, 120f), new Color(0.78f, 0.56f, 0.27f, 0.9f));
+        slotAImg = Img("IconoA", panel, sprLiquid, new Vector2(-640f, -62f), new Vector2(96f, 96f), Color.clear);
+        slotBGlow = Img("BrilloB", panel, sprSoft, new Vector2(-220f, -62f), new Vector2(190f, 190f), new Color(1, 1, 1, 0.12f));
+        Img("RanuraB", panel, sprRing, new Vector2(-220f, -62f), new Vector2(120f, 120f), new Color(0.78f, 0.56f, 0.27f, 0.9f));
+        slotBImg = Img("IconoB", panel, sprLiquid, new Vector2(-220f, -62f), new Vector2(96f, 96f), Color.clear);
+        Txt("A", panel, "A", 26, new Vector2(-640f, -140f), new Vector2(40, 30), new Color(1, 1, 1, 0.5f));
+        Txt("B", panel, "B", 26, new Vector2(-220f, -140f), new Vector2(40, 30), new Color(1, 1, 1, 0.5f));
 
-        centerHalo = Img("Halo", panel, sprSoft, new Vector2(-430f, -26f), new Vector2(380f, 380f), new Color(1, 1, 1, 0.12f));
-        centerFlask = R("Matraz", panel, new Vector2(-430f, -26f), new Vector2(280f, 280f));
+        centerHalo = Img("Halo", panel, sprSoft, new Vector2(-430f, -58f), new Vector2(380f, 380f), new Color(1, 1, 1, 0.12f));
+        centerFlask = R("Matraz", panel, new Vector2(-430f, -58f), new Vector2(280f, 280f));
         centerLiquid = Img("Liquido", centerFlask, sprLiquid, Vector2.zero, new Vector2(280f, 280f), Color.white);
         centerLiquid.type = Image.Type.Filled; centerLiquid.fillMethod = Image.FillMethod.Vertical; centerLiquid.fillOrigin = 0; centerLiquid.fillAmount = 0f;
         for (int i = 0; i < bubbles.Length; i++)
@@ -379,24 +379,24 @@ public class MixStation : MonoBehaviour, IInteractable
             bubbles[i] = bi.rectTransform; bubbleImgs[i] = bi;
         }
         centerGlass = Img("Vidrio", centerFlask, sprGlass, Vector2.zero, new Vector2(280f, 280f), Color.white);
-        resultName = Txt("Resultado", panel, "", 38, new Vector2(-430f, 150f), new Vector2(560f, 50f), Color.white);
+        resultName = Txt("Resultado", panel, "", 38, new Vector2(-430f, -198f), new Vector2(560f, 44f), Color.white);
         resultName.fontStyle = FontStyles.Bold;
 
-        clearBtn = MakeBtn("Limpiar", panel, new Vector2(-575f, -250f), new Vector2(230f, 66f), Clear, null);
+        clearBtn = MakeBtn("Limpiar", panel, new Vector2(-575f, -268f), new Vector2(230f, 66f), Clear, null);
         clearBtn.glow = Img("Brillo", clearBtn.rt, sprSoft, Vector2.zero, new Vector2(300f, 130f), new Color(1, 0.8f, 0.4f, 0));
         clearBtn.bg = Img("Fondo", clearBtn.rt, sprPanel, Vector2.zero, new Vector2(230f, 66f), new Color(0.15f, 0.17f, 0.2f, 0.95f)); clearBtn.bg.type = Image.Type.Sliced;
         clearBtn.label = Txt("T", clearBtn.rt, "LIMPIAR", 28, Vector2.zero, new Vector2(230f, 66f), Color.white);
         clearBtn.label.fontStyle = FontStyles.Bold;
 
-        mixBtn = MakeBtn("Mezclar", panel, new Vector2(-285f, -250f), new Vector2(300f, 66f), () => { var inv = PlayerInventory.Instance; if (inv != null && CanMix(inv)) StartMix(); }, () => { var inv = PlayerInventory.Instance; return inv != null && CanMix(inv); });
+        mixBtn = MakeBtn("Mezclar", panel, new Vector2(-285f, -268f), new Vector2(300f, 66f), () => { var inv = PlayerInventory.Instance; if (inv != null && CanMix(inv)) StartMix(); }, () => { var inv = PlayerInventory.Instance; return inv != null && CanMix(inv); });
         mixBtn.glow = Img("Brillo", mixBtn.rt, sprSoft, Vector2.zero, new Vector2(380f, 140f), new Color(1, 0.8f, 0.4f, 0));
         mixBtn.bg = Img("Fondo", mixBtn.rt, sprPanel, Vector2.zero, new Vector2(300f, 66f), new Color(0.85f, 0.62f, 0.25f)); mixBtn.bg.type = Image.Type.Sliced;
         mixBtn.label = Txt("T", mixBtn.rt, "MEZCLAR", 32, Vector2.zero, new Vector2(300f, 66f), Color.white);
         mixBtn.label.fontStyle = FontStyles.Bold;
 
-        msgText = Txt("Mensaje", panel, "", 28, new Vector2(-430f, -318f), new Vector2(700f, 40f), new Color(1f, 0.92f, 0.7f));
-        chipsText = Txt("Frascos", panel, "", 22, new Vector2(-430f, -372f), new Vector2(740f, 36f), Color.white);
-        Txt("Rotulo", panel, "TUS FRASCOS", 18, new Vector2(-430f, -350f), new Vector2(300, 22), new Color(1, 1, 1, 0.4f));
+        msgText = Txt("Mensaje", panel, "", 28, new Vector2(-430f, -330f), new Vector2(700f, 36f), new Color(1f, 0.92f, 0.7f));
+        chipsText = Txt("Frascos", panel, "", 22, new Vector2(-430f, -388f), new Vector2(740f, 32f), Color.white);
+        Txt("Rotulo", panel, "TUS FRASCOS", 18, new Vector2(-430f, -362f), new Vector2(300, 22), new Color(1, 1, 1, 0.4f));
 
         // libro
         for (int i = 0; i < Chemistry.CompoundCount; i++)
@@ -411,15 +411,15 @@ public class MixStation : MonoBehaviour, IInteractable
             r.flaskLiquid = Img("Liquido", r.bg.rectTransform, sprLiquid, new Vector2(-158f, 0f), new Vector2(64f, 64f), Color.white);
             r.flaskLiquid.type = Image.Type.Filled; r.flaskLiquid.fillMethod = Image.FillMethod.Vertical; r.flaskLiquid.fillOrigin = 0; r.flaskLiquid.fillAmount = 0.6f;
             r.flask = Img("Vidrio", r.bg.rectTransform, sprGlass, new Vector2(-158f, 0f), new Vector2(64f, 64f), Color.white);
-            r.name = Txt("Nombre", r.bg.rectTransform, "", 28, new Vector2(95f, 20f), new Vector2(470f, 34f), Color.white); r.name.alignment = TextAlignmentOptions.Left; r.name.fontStyle = FontStyles.Bold;
-            r.desc = Txt("Desc", r.bg.rectTransform, "", 19, new Vector2(95f, -15f), new Vector2(470f, 40f), Color.white); r.desc.alignment = TextAlignmentOptions.TopLeft;
+            r.name = Txt("Nombre", r.bg.rectTransform, "", 28, new Vector2(150f, 20f), new Vector2(440f, 34f), Color.white); r.name.alignment = TextAlignmentOptions.Left; r.name.fontStyle = FontStyles.Bold;
+            r.desc = Txt("Desc", r.bg.rectTransform, "", 19, new Vector2(150f, -15f), new Vector2(440f, 40f), Color.white); r.desc.alignment = TextAlignmentOptions.TopLeft;
             rows[i] = r;
         }
 
-        Txt("FPTitulo", panel, "FÓRMULA PRIMA", 30, new Vector2(240f, -318f), new Vector2(340, 40), new Color(1f, 0.82f, 0.45f)).fontStyle = FontStyles.Bold;
+        Txt("FPTitulo", panel, "FÓRMULA PRIMA", 30, new Vector2(215f, -318f), new Vector2(300, 40), new Color(1f, 0.82f, 0.45f)).fontStyle = FontStyles.Bold;
         for (int i = 0; i < primeDia.Length; i++)
-            primeDia[i] = Img("Comp" + i, panel, sprDiamond, new Vector2(420f + i * 52f, -318f), new Vector2(36f, 36f), new Color(0.25f, 0.27f, 0.32f));
-        primeText = Txt("FPTexto", panel, "", 22, new Vector2(640f, -318f), new Vector2(240, 30), Color.white);
+            primeDia[i] = Img("Comp" + i, panel, sprDiamond, new Vector2(400f + i * 48f, -318f), new Vector2(36f, 36f), new Color(0.25f, 0.27f, 0.32f));
+        primeText = Txt("FPTexto", panel, "", 22, new Vector2(690f, -318f), new Vector2(190, 30), Color.white);
         Txt("FPSub", panel, "Cada componente lo guarda uno de los 4 guardianes del instituto.", 19, new Vector2(420f, -352f), new Vector2(720, 28), new Color(1, 1, 1, 0.55f));
 
         Txt("Pie", panel, "[1] [2] [3] elegir reactivo   ·   [Enter] mezclar   ·   [Retroceso] limpiar   ·   [Esc] o [E] cerrar", 20, new Vector2(0f, -425f), new Vector2(1500f, 28f), new Color(1, 1, 1, 0.5f));
