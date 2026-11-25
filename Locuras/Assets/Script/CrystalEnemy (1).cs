@@ -142,7 +142,18 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
 
     void Update()
     {
-        if (dead || player == null || clock == null || agent == null || !agent.isOnNavMesh) return;
+        if (dead || player == null || clock == null || agent == null) return;
+        if (!agent.isOnNavMesh)
+        {
+            // Si el agente quedó fuera del NavMesh (típico en un jefe grande) se reintenta colocarlo cada segundo
+            if (Time.time >= nextWarp)
+            {
+                nextWarp = Time.time + 1f;
+                if (NavMesh.SamplePosition(transform.position, out var h2, 15f, NavMesh.AllAreas)) agent.Warp(h2.position);
+                else if (IsBoss) Debug.LogWarning("CrystalEnemy: " + name + " no está sobre el NavMesh y no hay uno cerca; no podrá moverse ni atacar.", this);
+            }
+            return;
+        }
 
         if (Time.time < stunUntil) { agent.isStopped = true; windingUp = false; return; }
 
@@ -191,7 +202,7 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
         {
             agent.isStopped = true;
             // Ataque en dos tiempos: prepara (windup) y golpea. Si te alejas en ese lapso, falla.
-            if (!windingUp && Time.time >= nextAttack && dist <= reach)
+            if (!windingUp && Time.time >= nextAttack && dist <= reach * (IsBoss ? 1.15f : 1f))
             {
                 windingUp = true;
                 strikeAt = Time.time + windup;
@@ -203,14 +214,21 @@ public class CrystalEnemy : MonoBehaviour, IChemTarget
             {
                 windingUp = false;
                 Vector3 now = player.position - transform.position; now.y = 0f;
-                bool inFront = Vector3.Dot(transform.forward, now.normalized) > 0.2f;
-                if (now.magnitude <= reach * 1.25f && inFront && playerHealth != null)
-                    playerHealth.TakeDamage(contactDps * attackInterval);
+                // Los jefes son enormes: tolerancia mayor de ángulo y distancia (antes casi nunca conectaban)
+                bool inFront = Vector3.Dot(transform.forward, now.normalized) > (IsBoss ? -0.25f : 0.2f);
+                float tol = IsBoss ? 1.6f : 1.25f;
+                float dmg = contactDps * attackInterval * (isFinalBoss ? 1.5f : 1f);
+                bool hit = now.magnitude <= reach * tol && inFront && playerHealth != null;
+#if UNITY_EDITOR
+                if (isFinalBoss) Debug.Log($"[Jefe final] golpe: dist={now.magnitude:0.0} alcance={reach:0.0} deFrente={inFront} daño={(hit ? dmg : 0f):0}");
+#endif
+                if (hit) playerHealth.TakeDamage(dmg);
             }
         }
     }
 
     bool windingUp;
+    float nextWarp;
     float strikeAt, nextAttack;
 
     Transform FirstModelRoot()
